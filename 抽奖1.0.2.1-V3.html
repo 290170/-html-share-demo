@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>公司开源抽奖转盘</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:"SimSun","宋体",serif;background:linear-gradient(135deg,#1a1a2e,#16213e,#0f3460);min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:15px;color:#fff}
+h1{font-family:"SimSun","宋体",serif;font-size:32px;margin-bottom:4px;text-shadow:2px 2px 4px rgba(0,0,0,.5);letter-spacing:6px}
+.subtitle{font-size:13px;color:#aaa;margin-bottom:12px;letter-spacing:2px}
+.top-bar{display:flex;justify-content:space-between;align-items:center;width:100%;max-width:1100px;margin-bottom:8px;flex-wrap:wrap;gap:8px}
+.top-left{display:flex;align-items:center;gap:12px}
+.user-info{display:none;gap:10px;align-items:center;background:rgba(0,0,0,.3);padding:6px 14px;border-radius:20px;border:1px solid rgba(255,215,0,.2);font-size:13px}
+.user-info.show{display:flex}
+.user-info span{color:#ffd700}
+.current-time{font-size:12px;color:#888;margin-top:1px}
+.logout-btn{background:rgba(255,100,100,.2);border:1px solid rgba(255,100,100,.3);color:#ff8888;padding:3px 10px;border-radius:10px;cursor:pointer;font-family:"SimSun","宋体",serif;font-size:11px;transition:all .3s}
+.logout-btn:hover{background:rgba(255,100,100,.4)}
+.top-right{display:flex;align-items:center;gap:8px}
+.points-display{background:linear-gradient(145deg,rgba(78,205,196,.2),rgba(69,183,209,.2));border:1px solid rgba(78,205,196,.4);padding:6px 14px;border-radius:18px;font-size:14px;display:none;align-items:center;gap:5px}
+.points-display .label{color:#4ecdc4;font-size:12px}
+.points-display .value{color:#4ecdc4;font-weight:bold;font-size:16px}
+.main-container{display:flex;gap:25px;align-items:flex-start;max-width:1100px;width:100%;justify-content:center;flex-wrap:wrap}
+.left-section{display:flex;flex-direction:column;align-items:center;gap:12px}
+.wheel-container{position:relative;width:380px;height:380px}
+#wheelCanvas{width:380px;height:380px}
+.pointer{position:absolute;top:-12px;left:50%;transform:translateX(-50%);width:0;height:0;border-left:12px solid transparent;border-right:12px solid transparent;border-top:26px solid #ff4444;z-index:10;filter:drop-shadow(0 2px 4px rgba(0,0,0,.5))}
+.pointer::after{content:"";position:absolute;top:-30px;left:-7px;width:14px;height:14px;background:#ff4444;border-radius:50%}
+.center-btn{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:72px;height:72px;border-radius:50%;background:linear-gradient(145deg,#ff6b6b,#ee5a5a);border:3px solid #fff;color:#fff;font-family:"SimSun","宋体",serif;font-size:24px;font-weight:bold;cursor:pointer;box-shadow:0 4px 15px rgba(0,0,0,.4),inset 0 2px 5px rgba(255,255,255,.3);transition:all .2s;z-index:20;display:flex;align-items:center;justify-content:center}
+.center-btn:hover{transform:translate(-50%,-50%) scale(1.05);box-shadow:0 6px 20px rgba(0,0,0,.5),inset 0 2px 5px rgba(255,255,255,.4)}
+.center-btn:active{transform:translate(-50%,-50%) scale(.95)}
+.center-btn:disabled{background:linear-gradient(145deg,#888,#666);cursor:not-allowed;transform:translate(-50%,-50%) scale(1)}
+.center-btn.spinning{animation:pulse .5s infinite alternate}
+@keyframes pulse{from{box-shadow:0 4px 15px rgba(255,107,107,.4)}to{box-shadow:0 4px 25px rgba(255,107,107,.8)}}
+.wheel-outer-ring{position:absolute;top:-8px;left:-8px;right:-8px;bottom:-8px;border:6px solid #ffd700;border-radius:50%;box-shadow:0 0 20px rgba(255,215,0,.3),inset 0 0 20px rgba(255,215,0,.1);pointer-events:none}
+.daily-limit-msg{color:#ff6b6b;font-size:13px;margin-top:6px;text-align:center;min-height:18px}
+.note-section{margin-top:10px;text-align:center;font-family:"SimSun","宋体",serif;font-size:13px;line-height:2;color:#ffd700;background:rgba(0,0,0,.3);padding:12px 20px;border-radius:10px;border:1px solid rgba(255,215,0,.3)}
+.note-section p{margin:1px 0}
+.prob-tag{display:inline-block;background:rgba(255,215,0,.15);padding:1px 6px;border-radius:8px;font-size:11px;margin-left:4px;border:1px solid rgba(255,215,0,.3)}
+.rules-panel{background:rgba(0,0,0,.25);border:1px solid rgba(255,215,0,.2);border-radius:10px;padding:12px 16px;width:100%;max-width:380px;font-size:12px;line-height:1.8;color:#ccc}
+.rules-panel .rules-title{color:#ffd700;font-size:14px;font-weight:bold;margin-bottom:6px;text-align:center}
+.rules-panel strong{color:#ffd700}
+.vouchers-panel{background:rgba(0,0,0,.25);border:1px solid rgba(255,215,0,.2);border-radius:10px;padding:12px 16px;width:100%;max-width:380px;display:none}
+.vouchers-panel .vouchers-title{color:#ffd700;font-size:14px;font-weight:bold;margin-bottom:8px;text-align:center}
+.voucher-list{display:flex;flex-direction:column;gap:6px;max-height:180px;overflow-y:auto}
+.voucher-list::-webkit-scrollbar{width:4px}
+.voucher-list::-webkit-scrollbar-track{background:rgba(0,0,0,.2)}
+.voucher-list::-webkit-scrollbar-thumb{background:rgba(255,215,0,.4);border-radius:2px}
+.voucher-item{display:flex;justify-content:space-between;align-items:center;padding:6px 10px;border-radius:6px;font-size:12px;border-left:3px solid}
+.voucher-item.first{background:rgba(255,215,0,.15);border-left-color:#ffd700}
+.voucher-item.second{background:rgba(192,192,192,.15);border-left-color:#c0c0c0}
+.voucher-item.third{background:rgba(205,127,50,.15);border-left-color:#cd7f32}
+.voucher-item .v-code{font-family:"Courier New",monospace;font-size:10px;color:#888;word-break:break-all}
+.voucher-item .v-amount{font-weight:bold;font-size:13px}
+.voucher-item.first .v-amount{color:#ffd700}
+.voucher-item.second .v-amount{color:#c0c0c0}
+.voucher-item.third .v-amount{color:#cd7f32}
+.voucher-item .v-expire{font-size:10px;color:#777}
+.voucher-item .v-expire.soon{color:#ff6b6b}
+.voucher-item .v-expire.expired{color:#666;text-decoration:line-through}
+.voucher-item .v-status{font-size:10px;padding:1px 5px;border-radius:3px}
+.v-status.valid{background:rgba(76,175,80,.2);color:#4caf50}
+.v-status.used{background:rgba(153,153,153,.2);color:#999}
+.v-status.expired{background:rgba(255,100,100,.2);color:#ff6b6b}
+.no-vouchers{text-align:center;color:#666;padding:15px;font-size:12px}
+.bill-panel{background:rgba(0,0,0,.25);border:1px solid rgba(78,205,196,.2);border-radius:10px;padding:12px 16px;width:100%;max-width:380px;display:none}
+.bill-panel .bill-title{color:#4ecdc4;font-size:14px;font-weight:bold;margin-bottom:8px;text-align:center}
+.bill-list{display:flex;flex-direction:column;gap:5px;max-height:200px;overflow-y:auto}
+.bill-list::-webkit-scrollbar{width:4px}
+.bill-list::-webkit-scrollbar-track{background:rgba(0,0,0,.2)}
+.bill-list::-webkit-scrollbar-thumb{background:rgba(78,205,196,.4);border-radius:2px}
+.bill-item{display:flex;justify-content:space-between;align-items:center;padding:6px 10px;border-radius:6px;font-size:12px;background:rgba(0,0,0,.15)}
+.bill-item .bill-time{color:#888;font-size:10px}
+.bill-item .bill-reason{color:#ccc;flex:1;margin:0 8px}
+.bill-item .bill-amount{font-weight:bold;font-size:13px}
+.bill-item .bill-amount.income{color:#4caf50}
+.bill-item .bill-amount.expense{color:#ff6b6b}
+.no-bill{text-align:center;color:#666;padding:15px;font-size:12px}
+.record-section{width:280px;min-height:480px;background:rgba(0,0,0,.4);border-radius:15px;border:2px solid rgba(255,215,0,.3);padding:18px;backdrop-filter:blur(10px)}
+.record-title{font-family:"SimSun","宋体",serif;font-size:20px;text-align:center;margin-bottom:12px;color:#ffd700;border-bottom:2px solid rgba(255,215,0,.3);padding-bottom:8px}
+.record-list{max-height:380px;overflow-y:auto}
+.record-list::-webkit-scrollbar{width:5px}
+.record-list::-webkit-scrollbar-track{background:rgba(0,0,0,.2);border-radius:3px}
+.record-list::-webkit-scrollbar-thumb{background:rgba(255,215,0,.5);border-radius:3px}
+.record-item{display:flex;justify-content:space-between;align-items:center;padding:8px 10px;margin-bottom:6px;border-radius:6px;font-size:13px;animation:slideIn .3s ease}
+@keyframes slideIn{from{opacity:0;transform:translateX(-20px)}to{opacity:1;transform:translateX(0)}}
+.record-item.thanks{background:rgba(100,100,100,.3);border-left:3px solid #888}
+.record-item.third{background:rgba(205,127,50,.3);border-left:3px solid #cd7f32}
+.record-item.second{background:rgba(192,192,192,.3);border-left:3px solid #c0c0c0}
+.record-item.first{background:rgba(255,215,0,.3);border-left:3px solid #ffd700}
+.record-time{font-size:10px;color:#aaa}
+.record-prize{font-weight:bold}
+.record-item.thanks .record-prize{color:#aaa}
+.record-item.third .record-prize{color:#cd7f32}
+.record-item.second .record-prize{color:#c0c0c0}
+.record-item.first .record-prize{color:#ffd700}
+.clear-btn{margin-top:12px;width:100%;padding:8px;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);color:#aaa;border-radius:6px;cursor:pointer;font-family:"SimSun","宋体",serif;font-size:13px;transition:all .3s}
+.clear-btn:hover{background:rgba(255,100,100,.2);color:#ff8888;border-color:rgba(255,100,100,.3)}
+.modal-overlay{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.75);z-index:200;justify-content:center;align-items:center;backdrop-filter:blur(8px)}
+.modal-overlay.show{display:flex;animation:fadeIn .3s ease}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+.modal-box{background:linear-gradient(145deg,#2a2a4a,#1a1a3e);border:3px solid #ffd700;border-radius:20px;padding:25px 35px;width:400px;max-width:90vw;box-shadow:0 0 50px rgba(255,215,0,.3);animation:popIn .5s cubic-bezier(.68,-.55,.265,1.55)}
+@keyframes popIn{from{transform:scale(.5);opacity:0}to{transform:scale(1);opacity:1}}
+.modal-title{font-family:"SimSun","宋体",serif;font-size:20px;text-align:center;margin-bottom:4px;color:#ffd700}
+.warning-text{text-align:center;color:#ff6b6b;font-size:12px;margin-bottom:15px;padding:6px;background:rgba(255,100,100,.1);border-radius:6px;border:1px solid rgba(255,100,100,.2)}
+.step-indicator{display:flex;justify-content:center;gap:6px;margin-bottom:15px}
+.step-dot{width:8px;height:8px;border-radius:50%;background:rgba(255,255,255,.2);transition:all .3s}
+.step-dot.active{background:#ffd700;box-shadow:0 0 6px rgba(255,215,0,.5)}
+.step-dot.done{background:#4ecdc4}
+.form-group{margin-bottom:12px}
+.form-label{display:block;font-size:13px;color:#ccc;margin-bottom:4px}
+.form-input{width:100%;padding:10px 12px;border:1px solid rgba(255,215,0,.3);border-radius:8px;background:rgba(0,0,0,.3);color:#fff;font-family:"SimSun","宋体",serif;font-size:14px;outline:none;transition:all .3s}
+.form-input:focus{border-color:#ffd700;box-shadow:0 0 8px rgba(255,215,0,.2)}
+.form-input::placeholder{color:#666}
+.code-row{display:flex;gap:8px}
+.code-row .form-input{flex:1}
+.code-btn{padding:0 14px;background:linear-gradient(145deg,#ffd700,#ffaa00);border:none;border-radius:8px;color:#1a1a2e;font-family:"SimSun","宋体",serif;font-size:13px;font-weight:bold;cursor:pointer;white-space:nowrap;transition:all .3s}
+.code-btn:hover:not(:disabled){transform:scale(1.02);box-shadow:0 3px 10px rgba(255,215,0,.4)}
+.code-btn:disabled{background:#555;color:#888;cursor:not-allowed}
+.submit-btn{width:100%;padding:12px;margin-top:8px;background:linear-gradient(145deg,#ffd700,#ffaa00);border:none;border-radius:10px;color:#1a1a2e;font-family:"SimSun","宋体",serif;font-size:16px;font-weight:bold;cursor:pointer;transition:all .3s;letter-spacing:3px}
+.submit-btn:hover{transform:scale(1.02);box-shadow:0 5px 15px rgba(255,215,0,.4)}
+.submit-btn:disabled{background:#555;color:#888;cursor:not-allowed;transform:none;box-shadow:none}
+.error-msg{color:#ff6b6b;font-size:12px;margin-top:4px;text-align:center;min-height:16px}
+.result-modal{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.7);z-index:100;justify-content:center;align-items:center;backdrop-filter:blur(5px)}
+.result-modal.show{display:flex;animation:fadeIn .3s ease}
+.result-content{background:linear-gradient(145deg,#2a2a4a,#1a1a3e);border:3px solid #ffd700;border-radius:20px;padding:35px 50px;text-align:center;box-shadow:0 0 50px rgba(255,215,0,.3);animation:popIn .5s cubic-bezier(.68,-.55,.265,1.55)}
+.result-title{font-family:"SimSun","宋体",serif;font-size:26px;margin-bottom:15px}
+.result-title.thanks{color:#888}
+.result-title.third{color:#cd7f32}
+.result-title.second{color:#c0c0c0}
+.result-title.first{color:#ffd700}
+.result-desc{font-size:16px;margin-bottom:20px;color:#ddd;line-height:1.6}
+.download-btn{padding:10px 25px;background:linear-gradient(145deg,#ffd700,#ffaa00);border:none;border-radius:20px;color:#1a1a2e;font-family:"SimSun","宋体",serif;font-size:15px;font-weight:bold;cursor:pointer;margin:4px;transition:all .3s}
+.download-btn:hover{transform:scale(1.05);box-shadow:0 5px 15px rgba(255,215,0,.4)}
+.close-btn{padding:10px 25px;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.3);border-radius:20px;color:#fff;font-family:"SimSun","宋体",serif;font-size:15px;cursor:pointer;margin:4px;transition:all .3s}
+.close-btn:hover{background:rgba(255,255,255,.2)}
+.confetti{position:fixed;width:8px;height:8px;pointer-events:none;z-index:99}
+@media(max-width:768px){.main-container{flex-direction:column;align-items:center}.record-section{width:100%;max-width:380px}.wheel-container{width:300px;height:300px}#wheelCanvas{width:300px;height:300px}.modal-box{padding:20px 18px;width:340px}.top-bar{flex-direction:column;align-items:center}}
+</style>
+</head>
+<body>
+<h1>幸运大转盘</h1>
+<p class="subtitle">公司开源抽奖程序 · 公平公正公开</p>
+<div class="top-bar">
+<div class="top-left">
+<div class="user-info" id="userInfoBar">
+<span id="userNameDisplay"></span>
+<span id="userPhoneDisplay"></span>
+<div class="current-time" id="headerTime"></div>
+<button class="logout-btn" onclick="logout()">退出</button>
+</div>
+</div>
+<div class="top-right">
+<div class="points-display" id="pointsDisplay">
+<span class="label">积分</span>
+<span class="value" id="pointsValue">0</span>
+</div>
+</div>
+</div>
+<div class="main-container">
+<div class="left-section">
+<div class="wheel-container">
+<div class="wheel-outer-ring"></div>
+<canvas id="wheelCanvas" width="380" height="380"></canvas>
+<div class="pointer"></div>
+<button class="center-btn" id="spinBtn" onclick="spin()">Go</button>
+</div>
+<div class="daily-limit-msg" id="dailyLimitMsg"></div>
+<div class="rules-panel">
+<div class="rules-title">积分规则</div>
+<p><strong>获取：</strong>消费1元得2积分，代金券抵扣不计入。</p>
+<p><strong>有效期：</strong>积分30天，代金券90天。</p>
+<p><strong>兑换：</strong>50分→2元券 · 100分→5元券 · 180分→10元券 · 20分→抽奖1次。</p>
+<p><strong>限制：</strong>每次最多使用一张代金券，不可找零。</p>
+</div>
+<div class="vouchers-panel" id="vouchersPanel">
+<div class="vouchers-title">我的代金券</div>
+<div class="voucher-list" id="voucherList"></div>
+</div>
+<div class="bill-panel" id="billPanel">
+<div class="bill-title">收支账单</div>
+<div class="bill-list" id="billList"></div>
+</div>
+<div class="note-section">
+<p>注：一等奖10元<span class="prob-tag">概率3%</span></p>
+<p>二等奖5元<span class="prob-tag">概率7%</span></p>
+<p>三等奖2元<span class="prob-tag">概率15%</span></p>
+<p>谢谢惠顾<span class="prob-tag">概率75%</span></p>
+<p style="margin-top:4px;color:#ff6b6b;font-size:12px">每次最多使用一张代金券 · 每次抽奖消耗20积分</p>
+</div>
+</div>
+<div class="record-section">
+<div class="record-title">中奖记录</div>
+<div class="record-list" id="recordList"></div>
+<button class="clear-btn" onclick="clearRecords()">清空记录</button>
+</div>
+</div>
+<div class="modal-overlay" id="authModal">
+<div class="modal-box">
+<div class="modal-title" id="authTitle">用户认证</div>
+<div class="warning-text">⚠ 请务必如实填写个人信息，否则抽奖结果无效</div>
+<div class="step-indicator">
+<div class="step-dot active" id="dot1"></div>
+<div class="step-dot" id="dot2"></div>
+<div class="step-dot" id="dot3"></div>
+</div>
+<div id="step1">
+<div class="form-group">
+<label class="form-label">手机号码</label>
+<input type="tel" class="form-input" id="phoneInput" placeholder="请输入11位手机号" maxlength="11">
+</div>
+<div class="form-group">
+<label class="form-label">验证码</label>
+<div class="code-row">
+<input type="text" class="form-input" id="codeInput" placeholder="请输入验证码" maxlength="6">
+<button class="code-btn" id="sendCodeBtn" onclick="sendCode()">获取验证码</button>
+</div>
+</div>
+<div class="error-msg" id="step1Error"></div>
+<button class="submit-btn" onclick="goStep2()">下一步</button>
+</div>
+<div id="step2" style="display:none">
+<div class="form-group">
+<label class="form-label">真实姓名</label>
+<input type="text" class="form-input" id="nameInput" placeholder="请输入真实姓名" maxlength="10">
+</div>
+<div class="form-group">
+<label class="form-label">身份证号</label>
+<input type="text" class="form-input" id="idcardInput" placeholder="请输入身份证号" maxlength="18">
+</div>
+<div class="error-msg" id="step2Error"></div>
+<button class="submit-btn" onclick="goStep3()">下一步</button>
+</div>
+<div id="step3" style="display:none">
+<div style="text-align:center;color:#ccc;line-height:1.8;margin-bottom:15px;font-size:14px">
+<p>手机号：<span id="confirmPhone" style="color:#ffd700"></span></p>
+<p>姓名：<span id="confirmName" style="color:#ffd700"></span></p>
+<p>身份证：<span id="confirmIdcard" style="color:#ffd700"></span></p>
+</div>
+<div class="error-msg" id="step3Error"></div>
+<button class="submit-btn" onclick="completeAuth()">确认认证</button>
+</div>
+</div>
+</div>
+<div class="result-modal" id="resultModal">
+<div class="result-content">
+<div class="result-title" id="resultTitle"></div>
+<div class="result-desc" id="resultDesc"></div>
+<div id="resultButtons"></div>
+</div>
+</div>
+<script>
+(function(){
+"use strict";
+var _k={AUTH:"lottery_auth_v3",RECORDS:"lottery_records_v3",LAST_SPIN:"lottery_last_spin_v3",POINTS:"lottery_points_v3",POINTS_LOG:"lottery_points_log_v3",VOUCHERS:"lottery_vouchers_v3"};
+var _a={0:{n:"谢谢惠顾",c:"#555",tc:"#ccc",v:0,cl:"thanks",p:75},1:{n:"三等奖",c:"#CD7F32",tc:"#fff",v:2,cl:"third",p:15},2:{n:"二等奖",c:"#C0C0C0",tc:"#333",v:5,cl:"second",p:7},3:{n:"一等奖",c:"#FFD700",tc:"#8B4513",v:10,cl:"first",p:3}};
+var _st=[3,0,0,0,1,0,0,0,2,0,0,0,1,0,0,0,1,0,0,0];
+var _sc=20;
+var _se=(Math.PI*2)/_sc;
+var _ss=_st.map(function(t,i){var m=_a[t];var s=i*_se-Math.PI/2;var e=s+_se;return{idx:i,t:t,n:m.n,c:m.c,tc:m.tc,v:m.v,cl:m.cl,p:m.p,sa:s,ea:e,ma:s+_se/2}});
+var _sb={0:[],1:[],2:[],3:[]};
+_ss.forEach(function(s){_sb[s.t].push(s.idx)});
+var _ca=0,_sp=false,_ai=null;
+var _ad={p:"",c:"",n:"",i:""};
+var _sd="",_cd=0;
+
+function _g(k){try{var d=localStorage.getItem(k);return d?JSON.parse(d):null}catch(e){return null}}
+function _s(k,v){localStorage.setItem(k,JSON.stringify(v))}
+function _mp(p){return p.replace(/(\d{3})\d{4}(\d{4})/,"$1****$2")}
+function _mi(i){return i.replace(/(\d{6}).*(\d{4})/,"$1********$2")}
+function _fd(d){return new Date(d).toLocaleDateString("zh-CN")}
+function _ad2(d,n){var x=new Date(d);x.setDate(x.getDate()+n);return x}
+function _ex(d){return new Date(d)<new Date()}
+function _du(d){return Math.ceil((new Date(d)-new Date())/(864e5))}
+function _gi(){return _g(_k.AUTH)}
+function _si(v){_s(_k.AUTH,v)}
+function _gp(p){var a=_g(_k.POINTS)||{};return a[p]||0}
+function _sp2(p,pts){var a=_g(_k.POINTS)||{};a[p]=Math.max(0,pts);_s(_k.POINTS,a)}
+function _pl(p,amt,rs,tp){var l=_g(_k.POINTS_LOG)||[];l.unshift({p:p,a:amt,r:rs,t:tp,time:new Date().toISOString(),ex:_ad2(new Date(),30).toISOString()});_s(_k.POINTS_LOG,l)}
+function _av(p,v,src){var vs=_g(_k.VOUCHERS)||[];var id="NO."+Date.now().toString(36).toUpperCase()+Math.random().toString(36).substring(2,6).toUpperCase();vs.unshift({id:id,p:p,v:v,s:src,ca:new Date().toISOString(),ex:_ad2(new Date(),90).toISOString(),u:false,ua:null});_s(_k.VOUCHERS,vs);return vs[0]}
+function _uv(p){return(_g(_k.VOUCHERS)||[]).filter(function(v){return v.p===p})}
+function _ul(p){return(_g(_k.POINTS_LOG)||[]).filter(function(l){return l.p===p})}
+
+function _dc(){var c=document.getElementById("wheelCanvas");var x=c.getContext("2d");var cx=c.width/2,cy=c.height/2,r=170;x.clearRect(0,0,c.width,c.height);_ss.forEach(function(s){x.beginPath();x.moveTo(cx,cy);x.arc(cx,cy,r,s.sa+_ca,s.ea+_ca);x.closePath();x.fillStyle=s.c;x.fill();x.strokeStyle="#fff";x.lineWidth=2;x.stroke();var ta=s.ma+_ca;var ch=s.n.split("");var cs=18;var th=ch.length*cs;var sr=r*0.56-th/2+cs/2;ch.forEach(function(chr,idx){var rr=sr+idx*cs;var px=cx+Math.cos(ta)*rr;var py=cy+Math.sin(ta)*rr;x.save();x.translate(px,py);var ra=ta+Math.PI/2;x.rotate(ra);x.fillStyle=s.tc;x.font="bold 15px SimSun,serif";x.textAlign="center";x.textBaseline="middle";x.fillText(chr,0,0);x.restore()});var da=s.ma+_ca;var dx=cx+Math.cos(da)*(r-7);var dy=cy+Math.sin(da)*(r-7);x.beginPath();x.arc(dx,dy,3,0,Math.PI*2);x.fillStyle="rgba(255,255,255,.6)";x.fill()});x.beginPath();x.arc(cx,cy,44,0,Math.PI*2);x.fillStyle="#fff";x.fill();x.strokeStyle="#ffd700";x.lineWidth=3;x.stroke();x.beginPath();x.arc(cx,cy,54,0,Math.PI*2);x.strokeStyle="rgba(255,215,0,.3)";x.lineWidth=1;x.setLineDash([4,4]);x.stroke();x.setLineDash([])}
+function _dp(){var r=Math.floor(Math.random()*100)+1;if(r<=3)return{t:3,r:r};if(r<=10)return{t:2,r:r};if(r<=25)return{t:1,r:r};return{t:0,r:r}}
+function _cta(ti){var ts=_ss[ti];var tm=-Math.PI/2;var cm=ts.ma+_ca;var df=tm-cm;while(df<0)df+=Math.PI*2;var es=5+Math.floor(Math.random()*4);df+=es*Math.PI*2;df+=(Math.random()-.5)*_se*.6;return _ca+df}
+function _eoc(t){return 1-Math.pow(1-t,3)}
+
+function _ck(){var a=_gi();if(a&&a.p&&a.n){_su(a);_cdl();_rv();_rb()}else{_sa()}}
+function _su(a){document.getElementById("userInfoBar").classList.add("show");document.getElementById("userNameDisplay").textContent=a.n;document.getElementById("userPhoneDisplay").textContent=_mp(a.p);var pts=_gp(a.p);document.getElementById("pointsDisplay").style.display="flex";document.getElementById("pointsValue").textContent=pts}
+function logout(){if(confirm("确定退出登录？")){localStorage.removeItem(_k.AUTH);location.reload()}}
+function _sa(){document.getElementById("authModal").classList.add("show");_raf()}
+function _ha(){document.getElementById("authModal").classList.remove("show")}
+function _raf(){_ad={p:"",c:"",n:"",i:""};_sd="";document.getElementById("phoneInput").value="";document.getElementById("codeInput").value="";document.getElementById("nameInput").value="";document.getElementById("idcardInput").value="";document.getElementById("step1Error").textContent="";document.getElementById("step2Error").textContent="";_ss2(1)}
+function _ss2(n){document.getElementById("step1").style.display=n===1?"block":"none";document.getElementById("step2").style.display=n===2?"block":"none";document.getElementById("step3").style.display=n===3?"block":"none";for(var i=1;i<=3;i++){var d=document.getElementById("dot"+i);d.className="step-dot";if(i<n)d.classList.add("done");if(i===n)d.classList.add("active")}var ts=["用户认证","实名认证","确认信息"];document.getElementById("authTitle").textContent=ts[n-1]}
+function sendCode(){var p=document.getElementById("phoneInput").value.trim();if(!/^1[3-9]\d{9}$/.test(p)){document.getElementById("step1Error").textContent="请输入正确的11位手机号";return}_sd=Math.floor(1e5+Math.random()*9e5).toString();alert("验证码已发送至 "+_mp(p)+"\n【演示】验证码："+_sd);_cd=60;var b=document.getElementById("sendCodeBtn");b.disabled=true;b.textContent=_cd+"秒后重发";var t=setInterval(function(){_cd--;if(_cd<=0){clearInterval(t);b.disabled=false;b.textContent="获取验证码"}else{b.textContent=_cd+"秒后重发"}},1e3);document.getElementById("step1Error").textContent=""}
+function goStep2(){var p=document.getElementById("phoneInput").value.trim();var c=document.getElementById("codeInput").value.trim();if(!/^1[3-9]\d{9}$/.test(p)){document.getElementById("step1Error").textContent="手机号格式错误";return}if(!_sd){document.getElementById("step1Error").textContent="请先获取验证码";return}if(c!==_sd){document.getElementById("step1Error").textContent="验证码错误";return}_ad.p=p;_ad.c=c;document.getElementById("step1Error").textContent="";_ss2(2)}
+function goStep3(){var n=document.getElementById("nameInput").value.trim();var i=document.getElementById("idcardInput").value.trim();if(!n||n.length<2){document.getElementById("step2Error").textContent="请输入真实姓名";return}if(!i||i.length<15){document.getElementById("step2Error").textContent="请输入身份证号";return}_ad.n=n;_ad.i=i;document.getElementById("step2Error").textContent="";document.getElementById("confirmPhone").textContent=_mp(_ad.p);document.getElementById("confirmName").textContent=_ad.n;document.getElementById("confirmIdcard").textContent=_mi(_ad.i);_ss2(3)}
+function completeAuth(){_si(_ad);_ha();_su(_ad);_cdl();_rv();_rb()}
+function _cdl(){var a=_gi();if(!a)return;var t=new Date().toLocaleDateString("zh-CN");var l=localStorage.getItem(_k.LAST_SPIN+"_"+a.p);var m=document.getElementById("dailyLimitMsg");var b=document.getElementById("spinBtn");if(l===t){m.textContent="您今日已抽奖，明天再来吧！";b.disabled=true;b.style.background="linear-gradient(145deg,#888,#666)";b.style.cursor="not-allowed"}else{m.textContent="";b.disabled=false;b.style.background="";b.style.cursor="pointer"}}
+function _mts(){var a=_gi();if(a){var t=new Date().toLocaleDateString("zh-CN");localStorage.setItem(_k.LAST_SPIN+"_"+a.p,t)}}
+
+function _rv(){var a=_gi();if(!a)return;var vs=_uv(a.p);var p=document.getElementById("vouchersPanel");var l=document.getElementById("voucherList");if(!vs.length){p.style.display="none";return}p.style.display="block";l.innerHTML=vs.map(function(v){var ex=_ex(v.ex);var du=_du(v.ex);var cl=v.v===10?"first":v.v===5?"second":"third";var sc=v.u?"used":ex?"expired":"valid";var st=v.u?"已使用":ex?"已过期":"有效";var ec=ex?"expired":du<=7?"soon":"";return'<div class="voucher-item '+cl+'"><div><div class="v-amount">\u00a5'+v.v+'</div><div class="v-code">'+v.id+'</div></div><div style="text-align:right"><div class="v-status '+sc+'">'+st+'</div><div class="v-expire '+ec+'">'+(ex?"已过期":du<=7?du+"天后过期":"有效期至"+_fd(v.ex))+"</div></div></div>"}).join("")}
+
+function _rb(){var a=_gi();if(!a)return;var bs=_ul(a.p);var p=document.getElementById("billPanel");var l=document.getElementById("billList");if(!bs.length){p.style.display="none";return}p.style.display="block";l.innerHTML=bs.map(function(b){var ic=b.t==="add"?"income":"expense";var s=b.t==="add"?"+":"-";return'<div class="bill-item"><div><div class="bill-time">'+_fd(b.time)+" "+new Date(b.time).toLocaleTimeString("zh-CN",{hour:"2-digit",minute:"2-digit"})+'</div><div class="bill-reason">'+b.r+'</div></div><div class="bill-amount '+ic+'">'+s+b.a+"</div></div>"}).join("")}
+
+function spin(){var a=_gi();if(!a){_sa();return}var t=new Date().toLocaleDateString("zh-CN");var ls=localStorage.getItem(_k.LAST_SPIN+"_"+a.p);if(ls===t){alert("您今日已抽奖，明天再来吧！");return}var cp=_gp(a.p);if(cp<20){alert("积分不足！每次抽奖需20积分，您当前有"+cp+"积分。\n请消费获取积分或联系管理员。");return}if(_sp)return;_sp=true;var b=document.getElementById("spinBtn");b.disabled=true;b.classList.add("spinning");_sp2(a.p,cp-20);_pl(a.p,20,"抽奖消耗","deduct");document.getElementById("pointsValue").textContent=_gp(a.p);var rs=_dp();var tt=rs.t;var ci=_sb[tt];var ti=ci[Math.floor(Math.random()*ci.length)];var ta=_cta(ti);var sa=_ca;var du=4500+Math.random()*1e3;var st=performance.now();function an(ct){var el=ct-st;var pr=Math.min(el/du,1);var ep=_eoc(pr);_ca=sa+(ta-sa)*ep;_dc();if(pr<1){_ai=requestAnimationFrame(an)}else{_sp=false;b.disabled=false;b.classList.remove("spinning");_mts();_cdl();var pm=_a[tt];var vc=null;if(tt!==0){vc=_av(a.p,pm.v,"lottery")}showResult(pm,vc);addRecord(pm);_rv();_rb();if(tt!==0)_cf()}}_ai=requestAnimationFrame(an)}
+function showResult(pm,vc){var m=document.getElementById("resultModal");var t=document.getElementById("resultTitle");var d=document.getElementById("resultDesc");var bt=document.getElementById("resultButtons");t.className="result-title "+pm.cl;if(pm.cl==="thanks"){t.textContent="谢谢惠顾";d.textContent="很遗憾，这次没有中奖，明天再来吧！\n已扣除20积分";bt.innerHTML='<button class="close-btn" onclick="closeModal()">关闭</button>'}else{t.textContent="恭喜获得"+pm.n+"！";d.textContent="您获得了"+pm.v+"元代金券！\n编号："+(vc?vc.id:"")+"\n（每次最多使用一张）";bt.innerHTML='<button class="download-btn" onclick="generateVoucher(\''+pm.cl+"\',"+pm.v+",'"+(vc?vc.id:"")+"')">下载代金券</button><button class=\"close-btn\" onclick=\"closeModal()\">关闭</button>"}m.classList.add("show")}
+function closeModal(){document.getElementById("resultModal").classList.remove("show")}
+
+function generateVoucher(tp,v,vid){var c=document.createElement("canvas");c.width=900;c.height=450;var x=c.getContext("2d");var cs={first:{b1:"#FFD700",b2:"#FFA500",bd:"#B8860B",tc:"#8B4513",lt:"#FFF8DC",dk:"#DAA520",lb:"一等奖"},second:{b1:"#F0F0F0",b2:"#C0C0C0",bd:"#808080",tc:"#333",lt:"#FFF",dk:"#A0A0A0",lb:"二等奖"},third:{b1:"#F4A460",b2:"#CD7F32",bd:"#8B4513",tc:"#FFF",lt:"#FFE4C4",dk:"#A0522D",lb:"三等奖"}};var o=cs[tp];var a=_gi();var g=x.createLinearGradient(0,0,900,450);g.addColorStop(0,o.b1);g.addColorStop(.5,o.lt);g.addColorStop(1,o.b2);x.fillStyle=g;x.fillRect(0,0,900,450);x.strokeStyle=o.bd;x.lineWidth=10;x.strokeRect(5,5,890,440);x.strokeStyle=o.bd;x.lineWidth=2;x.setLineDash([12,8]);x.strokeRect(25,25,850,400);x.setLineDash([]);x.globalAlpha=.08;x.fillStyle=o.dk;for(var r=0;r<6;r++)for(var cc=0;cc<12;cc++){x.beginPath();x.arc(60+cc*75,50+r*75,30,0,Math.PI*2);x.fill()}x.globalAlpha=1;var tg=x.createLinearGradient(0,0,900,0);tg.addColorStop(0,o.dk);tg.addColorStop(.5,o.bd);tg.addColorStop(1,o.dk);x.fillStyle=tg;x.fillRect(25,25,850,50);x.fillRect(25,375,850,50);x.fillStyle=o.lt;x.font="bold 24px SimSun,serif";x.textAlign="center";x.fillText("公司开源抽奖活动 \u00b7 代金券",450,58);x.save();x.translate(55,225);x.rotate(-Math.PI/2);x.fillStyle=o.bd;x.globalAlpha=.3;x.font="bold 20px SimSun,serif";x.fillText("公司开源抽奖活动专用代金券",0,0);x.restore();x.globalAlpha=1;x.save();x.translate(845,225);x.rotate(Math.PI/2);x.fillStyle=o.bd;x.globalAlpha=.3;x.font="bold 20px SimSun,serif";x.fillText("公司开源抽奖活动专用代金券",0,0);x.restore();x.globalAlpha=1;x.fillStyle=o.tc;x.font="bold 52px SimSun,serif";x.textAlign="center";x.fillText("代 金 券",450,130);x.strokeStyle=o.bd;x.lineWidth=2;x.beginPath();x.moveTo(320,145);x.lineTo(580,145);x.stroke();x.fillStyle=o.tc;x.font="bold 140px SimSun,serif";x.fillText("\u00a5"+v,450,260);x.fillStyle="rgba(0,0,0,.1)";x.fillText("\u00a5"+v,454,264);x.fillStyle=o.tc;x.fillText("\u00a5"+v,450,260);x.fillStyle=o.bd;x.font="bold 28px SimSun,serif";x.fillText(o.lb,450,310);x.fillStyle=o.tc;x.font="16px SimSun,serif";x.fillText("持券人："+(a?a.n:"未知"),450,340);x.font="14px SimSun,serif";x.fillText("编号："+(vid||""),450,360);var ed=_ad2(new Date(),90);x.font="18px SimSun,serif";x.fillText("有效期至："+ed.toLocaleDateString("zh-CN"),450,385);x.font="14px SimSun,serif";x.fillText("每次最多使用一张 \u00b7 不可找零 \u00b7 不可兑换现金",450,410);var cs2=25;var cr=[[25,25],[875,25],[25,425],[875,425]];x.strokeStyle=o.bd;x.lineWidth=4;cr.forEach(function(pt){var dx=pt[0]<450?1:-1;var dy=pt[1]<225?1:-1;x.beginPath();x.moveTo(pt[0],pt[1]+dy*cs2);x.lineTo(pt[0],pt[1]);x.lineTo(pt[0]+dx*cs2,pt[1]);x.stroke()});var lk=document.createElement("a");lk.download="代金券_"+v+"元_"+(a?a.n:"未知")+".png";lk.href=c.toDataURL("image/png");lk.click()}
+
+function addRecord(pm){var a=_gi();var rs=_g(_k.RECORDS)||[];rs.unshift({prize:pm.n,value:pm.v||0,class:pm.cl,time:new Date().toLocaleString("zh-CN"),user:a?a.n:"未知",phone:a?a.p:""});if(rs.length>100)rs.pop();_s(_k.RECORDS,rs);renderRecords();updateStats()}
+function renderRecords(){var l=document.getElementById("recordList");var rs=_g(_k.RECORDS)||[];if(!rs.length){l.innerHTML='<div style="text-align:center;color:#666;padding:30px 0;font-size:13px">暂无记录</div>';return}l.innerHTML=rs.map(function(r){return'<div class="record-item '+r.class+'"><div><div class="record-prize">'+r.prize+(r.value>0?" (\u00a5"+r.value+")":"")+'</div><div class="record-time">'+r.time+(r.user?" \u00b7 "+r.user:"")+"</div></div></div>"}).join("")}
+function updateStats(){var rs=_g(_k.RECORDS)||[];var st={first:0,second:0,third:0,thanks:0};rs.forEach(function(r){if(st[r.class]!==undefined)st[r.class]++});}
+function clearRecords(){if(confirm("确定清空所有中奖记录？")){localStorage.removeItem(_k.RECORDS);renderRecords();updateStats()}}
+function _cf(){var cols=["#FFD700","#FF6B6B","#4ECDC4","#45B7D1","#96CEB4","#FFEAA7","#FF69B4"];for(var i=0;i<50;i++){var co=document.createElement("div");co.className="confetti";co.style.left=Math.random()*100+"vw";co.style.top="-10px";co.style.backgroundColor=cols[Math.floor(Math.random()*cols.length)];co.style.width=Math.random()*10+5+"px";co.style.height=Math.random()*10+5+"px";co.style.borderRadius=Math.random()>.5?"50%":"0";co.style.transform="rotate("+Math.random()*360+"deg)";document.body.appendChild(co);var dur=2500+Math.random()*2e3;var xe=(Math.random()-.5)*300;co.animate([{transform:"translate(0,0) rotate(0deg)",opacity:1},{transform:"translate("+xe+"px,"+window.innerHeight+"px) rotate("+(720+Math.random()*720)+"deg)",opacity:0}],{duration:dur,easing:"cubic-bezier(.25,.46,.45,.94)"}).onfinish=function(){co.remove()}}}
+
+function startClock(){function up(){var n=new Date();document.getElementById("headerTime").textContent=n.getFullYear()+"/"+String(n.getMonth()+1).padStart(2,"0")+"/"+String(n.getDate()).padStart(2,"0")+" "+String(n.getHours()).padStart(2,"0")+":"+String(n.getMinutes()).padStart(2,"0")+":"+String(n.getSeconds()).padStart(2,"0")}up();setInterval(up,1e3)}
+
+_dc();_ck();renderRecords();updateStats();startClock();
+document.getElementById("resultModal").addEventListener("click",function(e){if(e.target===this)closeModal()});
+
+// Anti-debug
+setInterval(function(){debugger;},200);
+(function(){var t=160;var c=function(){if(window.outerHeight-window.innerHeight>t||window.outerWidth-window.innerWidth>t){document.body.innerHTML="<div style=text-align:center;padding:100px;font-size:24px;color:red>检测到开发者工具，页面已锁定</div>";throw new Error("DevTools")}};window.addEventListener("resize",c);setInterval(c,1e3)})();
+})();
+</script>
+</body>
+</html>
